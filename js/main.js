@@ -47,10 +47,9 @@ window.Game = window.Game || {};
 
     function init() {
         try {
+            Game.Input.init(canvas);
             resize();
             window.addEventListener('resize', resize);
-
-            Game.Input.init(canvas);
             Game.BulletManager.init();
             Game.ParticleManager.init();
             Game.ZombieManager.init();

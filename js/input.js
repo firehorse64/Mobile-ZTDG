@@ -31,6 +31,7 @@ Game.Input = {
     },
 
     updateScale(canvasW, canvasH) {
+        if (!this.canvas) return;
         const rect = this.canvas.getBoundingClientRect();
         this.scaleX = Game.Config.INTERNAL_WIDTH / rect.width;
         this.scaleY = Game.Config.INTERNAL_HEIGHT / rect.height;
