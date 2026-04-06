@@ -32,6 +32,7 @@ Game.Phase = {
     toBuild() {
         this.current = 'build';
         this.message = '';
+        Game.HUD._buildHintTimer = 8000;
 
         // Give wave bonus (except first wave)
         if (Game.Wave.number > 0) {
@@ -45,6 +46,7 @@ Game.Phase = {
         this.current = 'combat_countdown';
         this.timer = this.countdownTime;
         Game.Map.recalcPaths();
+        Game.HUD._combatHintTimer = 4000;
     },
 
     update(dt) {

@@ -31,18 +31,35 @@ window.Game = window.Game || {};
     function resize() {
         const w = window.innerWidth;
         const h = window.innerHeight;
+        const aspect = w / h;
 
-        // Set internal resolution
-        canvas.width = Game.Config.INTERNAL_WIDTH;
-        canvas.height = Game.Config.INTERNAL_HEIGHT;
+        // Scale internal resolution to match device aspect ratio
+        // Use a base short-axis of 480 and derive the other from aspect
+        var iw, ih;
+        if (aspect < 1) {
+            // Portrait
+            iw = 480;
+            ih = Math.round(480 / aspect);
+        } else {
+            // Landscape
+            ih = 480;
+            iw = Math.round(480 * aspect);
+        }
+
+        canvas.width = iw;
+        canvas.height = ih;
+
+        // Update config so HUD/camera use actual size
+        Game.Config.INTERNAL_WIDTH = iw;
+        Game.Config.INTERNAL_HEIGHT = ih;
 
         // CSS fills viewport
         canvas.style.width = w + 'px';
         canvas.style.height = h + 'px';
 
-        Game.Camera.screenW = Game.Config.INTERNAL_WIDTH;
-        Game.Camera.screenH = Game.Config.INTERNAL_HEIGHT;
-        Game.Input.updateScale(canvas.width, canvas.height);
+        Game.Camera.screenW = iw;
+        Game.Camera.screenH = ih;
+        Game.Input.updateScale(iw, ih);
     }
 
     function init() {

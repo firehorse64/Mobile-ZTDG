@@ -128,7 +128,43 @@ Game.HUD = {
         ctx.fillText('Build defenses, then man the gun!', sw / 2, sh / 2 + 90);
     },
 
+    // Track if user has interacted so we can fade hints
+    _buildHintTimer: 8000,
+
     drawBuildUI(ctx, sw, sh) {
+        // Joystick zone indicator (left side)
+        var joyZoneW = Math.round(sw * 0.35);
+        if (!Game.Input.joystick.active) {
+            ctx.fillStyle = 'rgba(255,255,255,0.03)';
+            ctx.fillRect(0, 44, joyZoneW, sh - 44);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath();
+            ctx.moveTo(joyZoneW, 44);
+            ctx.lineTo(joyZoneW, sh);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Joystick zone label (fades over time)
+        var hintAlpha = Math.max(0, Math.min(1, this._buildHintTimer / 2000));
+        if (hintAlpha > 0) {
+            this._buildHintTimer -= Game.Config.TICK_RATE;
+
+            // Left zone label
+            ctx.fillStyle = 'rgba(200,200,255,' + (hintAlpha * 0.6) + ')';
+            ctx.font = 'bold 14px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('DRAG TO', joyZoneW / 2, sh / 2 - 10);
+            ctx.fillText('MOVE', joyZoneW / 2, sh / 2 + 10);
+
+            // Right zone label
+            ctx.fillStyle = 'rgba(200,255,200,' + (hintAlpha * 0.6) + ')';
+            ctx.fillText('TAP TILES', joyZoneW + (sw - joyZoneW) / 2, sh / 2 - 10);
+            ctx.fillText('TO BUILD', joyZoneW + (sw - joyZoneW) / 2, sh / 2 + 10);
+        }
+
         // FIGHT button
         const btn = this.getFightButtonRect();
         ctx.fillStyle = '#a33';
@@ -137,13 +173,16 @@ Game.HUD = {
         ctx.lineWidth = 2;
         ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 20px monospace';
+        ctx.font = 'bold 18px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('FIGHT!', btn.x + btn.w / 2, btn.y + 33);
+        ctx.fillText('FIGHT!', btn.x + btn.w / 2, btn.y + 32);
 
         // Player weapon info
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(10, sh - 60, 180, 50);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(10, sh - 60, 170, 50);
+        ctx.strokeStyle = 'rgba(150,150,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(10, sh - 60, 170, 50);
         ctx.fillStyle = '#aaf';
         ctx.font = '13px monospace';
         ctx.textAlign = 'left';
@@ -151,7 +190,7 @@ Game.HUD = {
         const wCost = Game.Player.getWeaponUpgradeCost();
         if (wCost > 0) {
             ctx.fillStyle = Game.Economy.canAfford(wCost) ? '#4f4' : '#888';
-            ctx.fillText('Upgrade: $' + wCost, 18, sh - 22);
+            ctx.fillText('Tap: Upgrade $' + wCost, 18, sh - 22);
         } else {
             ctx.fillStyle = '#ff4';
             ctx.fillText('MAX LEVEL', 18, sh - 22);
@@ -161,12 +200,6 @@ Game.HUD = {
         if (Game.Phase.buildMenu.visible) {
             this.drawBuildMenu(ctx, sw, sh);
         }
-
-        // Hint
-        ctx.fillStyle = '#666';
-        ctx.font = '11px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('Tap tiles to build | Move with left stick', sw / 2, sh - 5);
     },
 
     drawBuildMenu(ctx, sw, sh) {
@@ -262,9 +295,11 @@ Game.HUD = {
         this._buildButtons.push({ x, y, w, h, action });
     },
 
+    _combatHintTimer: 4000,
+
     drawCombatUI(ctx, sw, sh) {
-        // Wave info
-        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        // Wave info bar
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(0, sh - 36, sw, 36);
 
         ctx.fillStyle = '#aaa';
@@ -275,9 +310,21 @@ Game.HUD = {
         ctx.textAlign = 'right';
         ctx.fillText('Killed: ' + Game.Wave.killedCount + '/' + Game.Wave.totalZombies, sw - 10, sh - 14);
 
+        // Aim hint (fades after a few seconds)
+        if (!Game.Input.aim.active && this._combatHintTimer > 0) {
+            this._combatHintTimer -= Game.Config.TICK_RATE;
+            var alpha = Math.min(1, this._combatHintTimer / 1500);
+            ctx.fillStyle = 'rgba(255,200,200,' + alpha + ')';
+            ctx.font = 'bold 18px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('TOUCH & DRAG TO AIM', sw / 2, sh / 2 + 80);
+            ctx.font = '13px monospace';
+            ctx.fillText('Auto-fires while touching', sw / 2, sh / 2 + 105);
+        }
+
         // Crosshair at aim position
         if (Game.Input.aim.active) {
-            ctx.strokeStyle = 'rgba(255,50,50,0.6)';
+            ctx.strokeStyle = 'rgba(255,50,50,0.7)';
             ctx.lineWidth = 2;
             const ax = Game.Input.aim.x;
             const ay = Game.Input.aim.y;
