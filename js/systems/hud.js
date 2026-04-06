@@ -2,7 +2,7 @@ window.Game = window.Game || {};
 
 Game.HUD = {
     _fightBtn: { x: 0, y: 0, w: 120, h: 50 },
-    _buildButtons: [],
+    _radialButtons: [], // { cx, cy, r, action }
 
     getFightButtonRect() {
         const sw = Game.Config.INTERNAL_WIDTH;
@@ -14,10 +14,12 @@ Game.HUD = {
         return this._fightBtn;
     },
 
-    getBuildMenuAction(tapX, tapY) {
-        for (const btn of this._buildButtons) {
-            if (tapX >= btn.x && tapX <= btn.x + btn.w &&
-                tapY >= btn.y && tapY <= btn.y + btn.h) {
+    getRadialHit(tapX, tapY) {
+        for (var i = 0; i < this._radialButtons.length; i++) {
+            var btn = this._radialButtons[i];
+            var dx = tapX - btn.cx;
+            var dy = tapY - btn.cy;
+            if (dx * dx + dy * dy <= btn.r * btn.r) {
                 return btn.action;
             }
         }
@@ -196,103 +198,163 @@ Game.HUD = {
             ctx.fillText('MAX LEVEL', 18, sh - 22);
         }
 
-        // Build menu
-        if (Game.Phase.buildMenu.visible) {
-            this.drawBuildMenu(ctx, sw, sh);
+        // Radial menu
+        if (Game.Phase.radial.mode !== 'none') {
+            this.drawRadialMenu(ctx, sw, sh);
         }
     },
 
-    drawBuildMenu(ctx, sw, sh) {
-        const bm = Game.Phase.buildMenu;
-        this._buildButtons = [];
+    drawRadialMenu(ctx, sw, sh) {
+        var r = Game.Phase.radial;
+        this._radialButtons = [];
 
-        let menuX = bm.screenX - 100;
-        let menuY = bm.screenY - 180;
-        menuX = Math.max(5, Math.min(menuX, sw - 210));
-        menuY = Math.max(50, Math.min(menuY, sh - 250));
+        // Advance animation
+        r.animTimer += Game.Config.TICK_RATE;
+        var anim = Math.min(1, r.animTimer / 200); // 200ms pop-in
 
-        ctx.fillStyle = 'rgba(0,0,0,0.85)';
-        ctx.strokeStyle = '#666';
-        ctx.lineWidth = 1;
+        // Get tile center in screen coords
+        var worldPos = Game.Map.tileToWorld(r.tileX, r.tileY);
+        var screen = Game.Camera.worldToScreen(worldPos.x, worldPos.y);
+        var cx = screen.x;
+        var cy = screen.y;
+        var ts = Game.Config.TILE_SIZE;
 
-        if (bm.turret) {
-            // Upgrade menu for existing turret
-            const menuW = 200;
-            const menuH = 140;
-            ctx.fillRect(menuX, menuY, menuW, menuH);
-            ctx.strokeRect(menuX, menuY, menuW, menuH);
+        // Draw tile highlight
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(cx - ts / 2, cy - ts / 2, ts, ts);
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(cx - ts / 2, cy - ts / 2, ts, ts);
 
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(bm.turret.type.toUpperCase() + ' Lv.' + (bm.turret.level + 1), menuX + menuW / 2, menuY + 22);
+        var hasSomething = r.tileType === Game.TileType.TURRET || r.tileType === Game.TileType.WALL;
 
-            // Upgrade button
-            const nextLevel = bm.turret.level + 1;
-            if (nextLevel < Game.Config.UPGRADE_LEVELS.length) {
-                const cost = Game.Config.UPGRADE_LEVELS[nextLevel].cost;
-                const canAfford = Game.Economy.canAfford(cost);
-                this._addButton(ctx, menuX + 10, menuY + 35, 180, 38,
-                    'Upgrade $' + cost, 'upgrade', canAfford ? '#358' : '#333', canAfford);
+        if (r.mode === 'select') {
+            // 3 radial buttons around tile
+            var ringR = 50 * anim;
+            var btnR = 22;
+            // Angles: build=top-left, destroy=top-right, info=top
+            var buttons = [
+                { angle: -Math.PI / 2 - 0.8, action: 'build', label: '+', color: '#4a4', enabled: !hasSomething, tooltip: 'Build' },
+                { angle: -Math.PI / 2 + 0.8, action: 'destroy', label: 'X', color: '#a44', enabled: hasSomething, tooltip: 'Destroy' },
+                { angle: -Math.PI / 2, action: 'info', label: 'UP', color: '#48f', enabled: hasSomething && r.turret != null, tooltip: 'Upgrade' }
+            ];
+
+            for (var i = 0; i < buttons.length; i++) {
+                var b = buttons[i];
+                var bx = cx + Math.cos(b.angle) * ringR;
+                var by = cy + Math.sin(b.angle) * ringR;
+
+                this._drawRadialButton(ctx, bx, by, btnR * anim, b.label, b.color, b.enabled);
+                if (b.enabled) {
+                    this._radialButtons.push({ cx: bx, cy: by, r: btnR + 5, action: b.action });
+                }
+
+                // Tooltip below button
+                ctx.fillStyle = b.enabled ? '#ddd' : '#666';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(b.tooltip, bx, by + btnR * anim + 12);
             }
 
-            // Sell button
-            const sellVal = Math.floor(Game.Config.TURRET_TYPES[bm.turret.type].cost * 0.5);
-            this._addButton(ctx, menuX + 10, menuY + 80, 180, 38,
-                'Sell +$' + sellVal, 'sell', '#633', true);
+            // Show info about what's on the tile
+            if (r.turret) {
+                var cfg = Game.Config.TURRET_TYPES[r.turret.type];
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(cx - 65, cy + ts / 2 + 4, 130, 34);
+                ctx.fillStyle = cfg.color;
+                ctx.font = 'bold 11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(r.turret.type.toUpperCase() + ' Lv.' + (r.turret.level + 1), cx, cy + ts / 2 + 18);
+                var nextLvl = r.turret.level + 1;
+                if (nextLvl < Game.Config.UPGRADE_LEVELS.length) {
+                    var cost = Game.Config.UPGRADE_LEVELS[nextLvl].cost;
+                    ctx.fillStyle = Game.Economy.canAfford(cost) ? '#4f4' : '#f44';
+                    ctx.fillText('Upgrade: $' + cost, cx, cy + ts / 2 + 32);
+                } else {
+                    ctx.fillStyle = '#ff4';
+                    ctx.fillText('MAX LEVEL', cx, cy + ts / 2 + 32);
+                }
+            } else if (r.wall) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(cx - 55, cy + ts / 2 + 4, 110, 20);
+                ctx.fillStyle = '#a88050';
+                ctx.font = 'bold 11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('WALL ' + Math.ceil(r.wall.health) + '/' + r.wall.maxHealth, cx, cy + ts / 2 + 18);
+            }
 
+        } else if (r.mode === 'build') {
+            // Sub-ring: 4 build options + back button
+            var ringR = 58 * anim;
+            var btnR = 22;
+            var options = [
+                { angle: -Math.PI / 2 - 0.9, action: 'gun', label: 'GUN', color: '#4af', cost: Game.Config.TURRET_TYPES.gun.cost },
+                { angle: -Math.PI / 2 - 0.3, action: 'shotgun', label: 'SHT', color: '#fa4', cost: Game.Config.TURRET_TYPES.shotgun.cost },
+                { angle: -Math.PI / 2 + 0.3, action: 'sniper', label: 'SNP', color: '#f4a', cost: Game.Config.TURRET_TYPES.sniper.cost },
+                { angle: -Math.PI / 2 + 0.9, action: 'wall', label: 'WAL', color: '#a88050', cost: Game.Config.WALL_COST }
+            ];
+
+            for (var i = 0; i < options.length; i++) {
+                var o = options[i];
+                var bx = cx + Math.cos(o.angle) * ringR;
+                var by = cy + Math.sin(o.angle) * ringR;
+                var canAfford = Game.Economy.canAfford(o.cost);
+
+                this._drawRadialButton(ctx, bx, by, btnR * anim, o.label, o.color, canAfford);
+                if (canAfford) {
+                    this._radialButtons.push({ cx: bx, cy: by, r: btnR + 5, action: o.action });
+                }
+
+                // Cost label
+                ctx.fillStyle = canAfford ? '#ddd' : '#666';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('$' + o.cost, bx, by + btnR * anim + 12);
+            }
+
+            // Back button below
+            var backX = cx;
+            var backY = cy + ringR * 0.9;
+            this._drawRadialButton(ctx, backX, backY, 16 * anim, '<', '#888', true);
+            this._radialButtons.push({ cx: backX, cy: backY, r: 20, action: 'back' });
+            ctx.fillStyle = '#bbb';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Back', backX, backY + 16 * anim + 10);
+        }
+    },
+
+    _drawRadialButton(ctx, cx, cy, r, label, color, enabled) {
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.beginPath();
+        ctx.arc(cx + 2, cy + 2, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Button fill
+        if (enabled) {
+            ctx.fillStyle = color;
         } else {
-            // Build menu for empty tile
-            const menuW = 200;
-            const menuH = 260;
-            ctx.fillRect(menuX, menuY, menuW, menuH);
-            ctx.strokeRect(menuX, menuY, menuW, menuH);
-
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('BUILD', menuX + menuW / 2, menuY + 22);
-
-            let y = menuY + 32;
-            const types = ['gun', 'shotgun', 'sniper'];
-            for (const type of types) {
-                const cfg = Game.Config.TURRET_TYPES[type];
-                const canAfford = Game.Economy.canAfford(cfg.cost);
-                this._addButton(ctx, menuX + 10, y, 180, 38,
-                    type.toUpperCase() + ' $' + cfg.cost, type,
-                    canAfford ? cfg.color + '44' : '#333', canAfford);
-                y += 44;
-            }
-
-            // Wall
-            const wallAfford = Game.Economy.canAfford(Game.Config.WALL_COST);
-            this._addButton(ctx, menuX + 10, y, 180, 38,
-                'WALL $' + Game.Config.WALL_COST, 'wall',
-                wallAfford ? '#654' : '#333', wallAfford);
-            y += 44;
-
-            // Repair base
-            if (Game.BaseHealth.current < Game.BaseHealth.max) {
-                const repairAfford = Game.Economy.canAfford(Game.Config.REPAIR_COST);
-                this._addButton(ctx, menuX + 10, y, 180, 38,
-                    'REPAIR BASE $' + Game.Config.REPAIR_COST, 'repair',
-                    repairAfford ? '#464' : '#333', repairAfford);
-            }
+            ctx.fillStyle = '#333';
         }
-    },
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
 
-    _addButton(ctx, x, y, w, h, text, action, bgColor, enabled) {
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = enabled ? '#aaa' : '#555';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, w, h);
+        // Border
+        ctx.strokeStyle = enabled ? '#fff' : '#555';
+        ctx.lineWidth = enabled ? 2 : 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Label
         ctx.fillStyle = enabled ? '#fff' : '#666';
-        ctx.font = 'bold 13px monospace';
+        ctx.font = 'bold ' + Math.max(8, Math.round(r * 0.6)) + 'px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(text, x + w / 2, y + h / 2 + 5);
-
-        this._buildButtons.push({ x, y, w, h, action });
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, cx, cy);
+        ctx.textBaseline = 'alphabetic';
     },
 
     _combatHintTimer: 4000,

@@ -120,8 +120,17 @@ Game.Phase = {
         }
     },
 
-    // Build menu state
-    buildMenu: { visible: false, tileX: 0, tileY: 0, screenX: 0, screenY: 0, turret: null },
+    // Radial menu state
+    // mode: 'none' | 'select' (3-button ring) | 'build' (sub-ring of build options)
+    radial: {
+        mode: 'none',
+        tileX: 0,
+        tileY: 0,
+        tileType: 0,
+        turret: null,
+        wall: null,
+        animTimer: 0
+    },
 
     handleBuildInput() {
         const taps = Game.Input.consumeTaps();
@@ -132,86 +141,103 @@ Game.Phase = {
             if (tap.x >= fightBtn.x && tap.x <= fightBtn.x + fightBtn.w &&
                 tap.y >= fightBtn.y && tap.y <= fightBtn.y + fightBtn.h) {
                 this.startCombat();
-                this.buildMenu.visible = false;
+                this.radial.mode = 'none';
                 return;
             }
 
             // Check if tapping weapon upgrade area (bottom-left)
             const sh = Game.Config.INTERNAL_HEIGHT;
             if (tap.x >= 10 && tap.x <= 190 && tap.y >= sh - 60 && tap.y <= sh - 10) {
-                this.executeBuildAction('upgrade_weapon');
+                var wCost = Game.Player.getWeaponUpgradeCost();
+                if (wCost > 0 && Game.Economy.spend(wCost)) {
+                    Game.Player.weaponLevel++;
+                }
                 return;
             }
 
-            // Check if tapping build menu buttons
-            if (this.buildMenu.visible) {
-                const action = Game.HUD.getBuildMenuAction(tap.x, tap.y);
-                if (action) {
-                    this.executeBuildAction(action);
-                    this.buildMenu.visible = false;
+            // Check if tapping a radial menu button
+            if (this.radial.mode !== 'none') {
+                var hit = Game.HUD.getRadialHit(tap.x, tap.y);
+                if (hit) {
+                    this.executeRadialAction(hit);
                     return;
                 }
-                // Tap elsewhere closes menu
-                this.buildMenu.visible = false;
+                // Tap elsewhere closes radial
+                this.radial.mode = 'none';
                 return;
             }
 
-            // Convert tap to world coords and check tile
+            // Convert tap to world coords and select tile
             const world = Game.Camera.screenToWorld(tap.x, tap.y);
             const tile = Game.Map.worldToTile(world.x, world.y);
             const tileType = Game.Map.getTile(tile.x, tile.y);
 
-            if (tileType === Game.TileType.EMPTY) {
-                this.buildMenu.visible = true;
-                this.buildMenu.tileX = tile.x;
-                this.buildMenu.tileY = tile.y;
-                this.buildMenu.screenX = tap.x;
-                this.buildMenu.screenY = tap.y;
-                this.buildMenu.turret = null;
-            } else if (tileType === Game.TileType.TURRET) {
-                const turret = Game.TurretManager.getAt(tile.x, tile.y);
-                if (turret) {
-                    this.buildMenu.visible = true;
-                    this.buildMenu.tileX = tile.x;
-                    this.buildMenu.tileY = tile.y;
-                    this.buildMenu.screenX = tap.x;
-                    this.buildMenu.screenY = tap.y;
-                    this.buildMenu.turret = turret;
-                }
+            // Allow selecting empty, wall, and turret tiles (not base/spawn/out-of-bounds)
+            if (tileType === Game.TileType.EMPTY || tileType === Game.TileType.WALL || tileType === Game.TileType.TURRET) {
+                this.radial.mode = 'select';
+                this.radial.tileX = tile.x;
+                this.radial.tileY = tile.y;
+                this.radial.tileType = tileType;
+                this.radial.turret = Game.TurretManager.getAt(tile.x, tile.y);
+                this.radial.wall = Game.WallManager.getAt(tile.x, tile.y);
+                this.radial.animTimer = 0;
             }
         }
     },
 
-    executeBuildAction(action) {
-        const bm = this.buildMenu;
+    executeRadialAction(action) {
+        var r = this.radial;
+        var hasSomething = r.tileType === Game.TileType.TURRET || r.tileType === Game.TileType.WALL;
+
         switch (action) {
+            case 'build':
+                if (!hasSomething) {
+                    // Open build sub-ring
+                    r.mode = 'build';
+                    r.animTimer = 0;
+                }
+                break;
+            case 'destroy':
+                if (hasSomething) {
+                    if (r.turret) {
+                        var cfg = Game.Config.TURRET_TYPES[r.turret.type];
+                        Game.Economy.addCurrency(Math.floor(cfg.cost * 0.5));
+                        Game.TurretManager.remove(r.turret);
+                    } else if (r.wall) {
+                        Game.Economy.addCurrency(Math.floor(Game.Config.WALL_COST * 0.5));
+                        Game.WallManager.remove(r.wall);
+                        Game.Map.setTile(r.tileX, r.tileY, Game.TileType.EMPTY);
+                    }
+                    r.mode = 'none';
+                }
+                break;
+            case 'info':
+                if (r.turret) {
+                    // Upgrade turret
+                    Game.TurretManager.upgrade(r.turret);
+                }
+                // Keep menu open to see result
+                break;
+            // Build sub-ring options
             case 'gun':
             case 'shotgun':
             case 'sniper':
-                Game.TurretManager.place(bm.tileX, bm.tileY, action);
+                Game.TurretManager.place(r.tileX, r.tileY, action);
+                r.mode = 'none';
                 break;
             case 'wall':
-                Game.WallManager.place(bm.tileX, bm.tileY);
+                Game.WallManager.place(r.tileX, r.tileY);
+                r.mode = 'none';
                 break;
-            case 'upgrade':
-                if (bm.turret) Game.TurretManager.upgrade(bm.turret);
-                break;
-            case 'sell':
-                if (bm.turret) {
-                    const cfg = Game.Config.TURRET_TYPES[bm.turret.type];
-                    Game.Economy.addCurrency(Math.floor(cfg.cost * 0.5));
-                    Game.TurretManager.remove(bm.turret);
-                }
-                break;
-            case 'upgrade_weapon':
-                const cost = Game.Player.getWeaponUpgradeCost();
-                if (cost > 0 && Game.Economy.spend(cost)) {
-                    Game.Player.weaponLevel++;
-                }
-                break;
-            case 'repair':
-                Game.BaseHealth.repair();
+            case 'back':
+                r.mode = 'select';
+                r.animTimer = 0;
                 break;
         }
+
+        // Refresh tile state after action
+        r.tileType = Game.Map.getTile(r.tileX, r.tileY);
+        r.turret = Game.TurretManager.getAt(r.tileX, r.tileY);
+        r.wall = Game.WallManager.getAt(r.tileX, r.tileY);
     }
 };
