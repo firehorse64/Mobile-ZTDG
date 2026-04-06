@@ -98,22 +98,34 @@ Game.HUD = {
     },
 
     drawTitle(ctx, sw, sh) {
-        ctx.fillStyle = '#111';
+        // Dark background with subtle gradient feel
+        ctx.fillStyle = '#1a1a2e';
         ctx.fillRect(0, 0, sw, sh);
 
-        ctx.fillStyle = '#4a4';
-        ctx.font = 'bold 36px monospace';
+        // Decorative border
+        ctx.strokeStyle = '#4a4';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(40, sh / 2 - 120, sw - 80, 230);
+
+        // Title
+        ctx.fillStyle = '#6f6';
+        ctx.font = 'bold 40px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('ZOMBIE', sw / 2, sh / 2 - 60);
-        ctx.fillText('TOWER DEFENSE', sw / 2, sh / 2 - 20);
+        ctx.fillText('ZOMBIE', sw / 2, sh / 2 - 55);
 
-        ctx.fillStyle = '#888';
-        ctx.font = '16px monospace';
-        ctx.fillText('Tap to Start', sw / 2, sh / 2 + 40);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 30px monospace';
+        ctx.fillText('TOWER DEFENSE', sw / 2, sh / 2 - 15);
 
-        ctx.fillStyle = '#555';
-        ctx.font = '12px monospace';
-        ctx.fillText('Build defenses, then man the gun!', sw / 2, sh / 2 + 80);
+        // Tap prompt (pulsing)
+        var pulse = 0.6 + 0.4 * Math.sin(Date.now() / 400);
+        ctx.fillStyle = 'rgba(255,255,100,' + pulse + ')';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText('TAP TO START', sw / 2, sh / 2 + 50);
+
+        ctx.fillStyle = '#aaa';
+        ctx.font = '14px monospace';
+        ctx.fillText('Build defenses, then man the gun!', sw / 2, sh / 2 + 90);
     },
 
     drawBuildUI(ctx, sw, sh) {
