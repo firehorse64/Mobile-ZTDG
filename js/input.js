@@ -50,7 +50,10 @@ Game.Input = {
             const t = e.changedTouches[i];
             const pos = this._getPos(t);
 
-            if (Game.Phase && Game.Phase.current === 'combat') {
+            if (!Game.Phase || Game.Phase.current === 'title' || Game.Phase.current === 'game_over' || Game.Phase.current === 'wave_complete') {
+                // Menu screens: any touch is a tap
+                this._pendingTaps.push({ x: pos.x, y: pos.y });
+            } else if (Game.Phase.current === 'combat' || Game.Phase.current === 'combat_countdown') {
                 // In combat: any touch is aim
                 if (!this.aim.active) {
                     this.aim.active = true;
@@ -131,7 +134,9 @@ Game.Input = {
         };
         this._mouseDown = true;
 
-        if (Game.Phase && Game.Phase.current === 'combat') {
+        if (!Game.Phase || Game.Phase.current === 'title' || Game.Phase.current === 'game_over' || Game.Phase.current === 'wave_complete') {
+            this._pendingTaps.push({ x: pos.x, y: pos.y });
+        } else if (Game.Phase.current === 'combat' || Game.Phase.current === 'combat_countdown') {
             this.aim.active = true;
             this.aim.x = pos.x;
             this.aim.y = pos.y;
