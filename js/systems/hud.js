@@ -47,8 +47,8 @@ Game.HUD = {
             this.drawGameOver(ctx, sw, sh);
         }
 
-        // Center message
-        if (Game.Phase.message) {
+        // Center message (skip on title and game_over since they draw their own)
+        if (Game.Phase.message && phase !== 'title' && phase !== 'game_over') {
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 28px monospace';
             ctx.textAlign = 'center';
