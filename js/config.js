@@ -2,8 +2,8 @@ window.Game = window.Game || {};
 
 Game.Config = {
     TILE_SIZE: 32,
-    MAP_WIDTH: 40,
-    MAP_HEIGHT: 40,
+    MAP_WIDTH: 50,
+    MAP_HEIGHT: 50,
     INTERNAL_WIDTH: 640,
     INTERNAL_HEIGHT: 960,
 

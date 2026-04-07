@@ -173,7 +173,9 @@ Game.Phase = {
             const tileType = Game.Map.getTile(tile.x, tile.y);
 
             // Allow selecting empty, wall, and turret tiles (not base/spawn/out-of-bounds)
-            if (tileType === Game.TileType.EMPTY || tileType === Game.TileType.WALL || tileType === Game.TileType.TURRET) {
+            if (tileType === Game.TileType.EMPTY || tileType === Game.TileType.WALL ||
+                tileType === Game.TileType.TURRET || tileType === Game.TileType.ROAD ||
+                tileType === Game.TileType.RUBBLE) {
                 this.radial.mode = 'select';
                 this.radial.tileX = tile.x;
                 this.radial.tileY = tile.y;

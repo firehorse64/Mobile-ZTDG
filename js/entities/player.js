@@ -33,7 +33,7 @@ Game.Player = {
                 const tileY = Math.floor(ny / ts);
                 const tile = Game.Map.getTile(tileX, tileY);
 
-                if (tile !== Game.TileType.WALL && tile !== Game.TileType.TURRET && tile !== -1) {
+                if (Game.Map.isPassable(tile)) {
                     this.x = nx;
                     this.y = ny;
                 }
