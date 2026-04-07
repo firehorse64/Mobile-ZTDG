@@ -150,8 +150,8 @@ Game.Renderer = {
             }
 
             // Range circle (when build menu targets this turret)
-            if (Game.Phase.current === 'build' && Game.Phase.buildMenu.visible &&
-                Game.Phase.buildMenu.turret === t) {
+            if (Game.Phase.current === 'build' && Game.Phase.radial.mode !== 'none' &&
+                Game.Phase.radial.turret === t) {
                 const upgr = Game.Config.UPGRADE_LEVELS[t.level];
                 const range = cfg.range * upgr.range;
                 ctx.strokeStyle = 'rgba(255,255,255,0.15)';
