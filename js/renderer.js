@@ -1,607 +1,229 @@
 window.Game = window.Game || {};
-
 Game.Renderer = {
-    groundCanvas: null,
-    groundCtx: null,
+    chunkCanvases: {},
 
-    init() {
-        this.groundCanvas = document.createElement('canvas');
-        this.groundCanvas.width = Game.Config.MAP_WIDTH * Game.Config.TILE_SIZE;
-        this.groundCanvas.height = Game.Config.MAP_HEIGHT * Game.Config.TILE_SIZE;
-        this.groundCtx = this.groundCanvas.getContext('2d');
-        this.renderGround();
-    },
+    init() { this.chunkCanvases = {}; },
 
-    renderGround() {
-        var ctx = this.groundCtx;
-        var ts = Game.Config.TILE_SIZE;
-        var map = Game.Map;
-        var w = map.width;
-        var h = map.height;
-
-        // Dark asphalt base
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(0, 0, this.groundCanvas.width, this.groundCanvas.height);
-
-        for (var y = 0; y < h; y++) {
-            for (var x = 0; x < w; x++) {
-                var tile = map.getTile(x, y);
-                var d = map.getDecor(x, y);
-                var px = x * ts;
-                var py = y * ts;
-
-                if (tile === Game.TileType.ROAD) {
-                    this._drawRoad(ctx, px, py, ts, d, x, y);
-                } else if (tile === Game.TileType.RUIN) {
-                    this._drawRuin(ctx, px, py, ts, d, x, y);
-                } else if (tile === Game.TileType.RUBBLE) {
-                    this._drawRubble(ctx, px, py, ts, d);
-                } else if (tile === Game.TileType.EMPTY) {
-                    this._drawGround(ctx, px, py, ts, d);
-                } else if (tile === Game.TileType.BASE) {
-                    this._drawBase(ctx, px, py, ts, d);
-                } else if (tile === Game.TileType.SPAWN) {
-                    this._drawSpawn(ctx, px, py, ts, d);
-                }
+    getChunkCanvas(cx, cy) {
+        var key = cx + ',' + cy;
+        if (Game.World.dirtyChunks[key]) { delete this.chunkCanvases[key]; delete Game.World.dirtyChunks[key]; }
+        if (this.chunkCanvases[key]) return this.chunkCanvases[key];
+        var cs = Game.Config.CHUNK_SIZE, ts = Game.Config.TILE_SIZE;
+        var canvas = document.createElement('canvas');
+        canvas.width = cs * ts; canvas.height = cs * ts;
+        var ctx = canvas.getContext('2d');
+        var baseTX = cx * cs, baseTY = cy * cs;
+        ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        for (var y = 0; y < cs; y++) {
+            for (var x = 0; x < cs; x++) {
+                var tx = baseTX + x, ty = baseTY + y;
+                var tile = Game.World.getTile(tx, ty);
+                var d = Game.World.getDecor(tx, ty);
+                var px = x * ts, py = y * ts;
+                this.drawTile(ctx, px, py, ts, tile, d, tx, ty);
             }
         }
-
-        // Road markings pass (draw on top of road tiles)
-        this._drawRoadMarkings(ctx, ts, w, h);
-
-        Game.Map.groundDirty = false;
+        this.chunkCanvases[key] = canvas;
+        return canvas;
     },
 
-    _drawRoad(ctx, px, py, ts, d) {
-        // Cracked asphalt road
-        var shade = 35 + (d % 10);
-        ctx.fillStyle = 'rgb(' + shade + ',' + shade + ',' + (shade + 2) + ')';
-        ctx.fillRect(px, py, ts, ts);
-
-        // Random cracks
-        if (d % 7 === 0) {
-            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(px + (d % 15) + 4, py + (d % 12) + 2);
-            ctx.lineTo(px + ts / 2 + (d % 8), py + ts / 2 + (d % 6));
-            ctx.lineTo(px + ts - (d % 10) - 4, py + ts - (d % 8));
-            ctx.stroke();
+    drawTile(ctx, px, py, ts, tile, d, tx, ty) {
+        var T = Game.TileType;
+        switch (tile) {
+            case T.ROAD:
+                var s = 35 + d % 10; ctx.fillStyle = 'rgb(' + s + ',' + s + ',' + (s + 2) + ')'; ctx.fillRect(px, py, ts, ts);
+                if (d % 7 === 0) { ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1; ctx.beginPath();
+                    ctx.moveTo(px + d % 15 + 4, py + d % 12 + 2); ctx.lineTo(px + ts - d % 10 - 4, py + ts - d % 8); ctx.stroke(); }
+                break;
+            case T.RUIN:
+                var scav = Game.World.scavenged[ty * Game.World.width + tx];
+                var blockId = (Math.floor(tx / 6) * 7 + Math.floor(ty / 6)) % 5;
+                var colors = ['#3a3530', '#353040', '#30383a', '#3a3035', '#383530'];
+                ctx.fillStyle = scav ? '#2a2520' : colors[blockId]; ctx.fillRect(px, py, ts, ts);
+                ctx.strokeStyle = '#555045'; ctx.lineWidth = 1;
+                var w = Game.World.width;
+                if (ty > 0 && Game.World.tiles[(ty - 1) * w + tx] !== T.RUIN) { ctx.beginPath(); ctx.moveTo(px, py + 1); ctx.lineTo(px + ts, py + 1); ctx.stroke(); }
+                if (ty < Game.World.height - 1 && Game.World.tiles[(ty + 1) * w + tx] !== T.RUIN) { ctx.beginPath(); ctx.moveTo(px, py + ts - 1); ctx.lineTo(px + ts, py + ts - 1); ctx.stroke(); }
+                if (tx > 0 && Game.World.tiles[ty * w + tx - 1] !== T.RUIN) { ctx.beginPath(); ctx.moveTo(px + 1, py); ctx.lineTo(px + 1, py + ts); ctx.stroke(); }
+                if (tx < w - 1 && Game.World.tiles[ty * w + tx + 1] !== T.RUIN) { ctx.beginPath(); ctx.moveTo(px + ts - 1, py); ctx.lineTo(px + ts - 1, py + ts); ctx.stroke(); }
+                if (!scav) { ctx.fillStyle = 'rgba(200,180,100,0.08)'; ctx.fillRect(px + 4, py + 4, ts - 8, ts - 8); }
+                break;
+            case T.RUBBLE:
+                var s = 28 + d % 12; ctx.fillStyle = 'rgb(' + s + ',' + (s - 2) + ',' + (s - 4) + ')'; ctx.fillRect(px, py, ts, ts);
+                for (var i = 0; i < 1 + d % 2; i++) { ctx.fillStyle = 'rgb(' + (45 + (d * (i + 3)) % 25) + ',40,35)';
+                    ctx.fillRect(px + 3 + (d * (i + 1)) % (ts - 10), py + 3 + (d * (i + 2)) % (ts - 10), 3 + (d + i) % 5, 2 + (d + i * 2) % 4); }
+                break;
+            case T.WATER:
+                var wave = Math.sin((tx + ty) * 0.5 + d * 0.1) * 10;
+                ctx.fillStyle = 'rgb(25,35,' + Math.floor(65 + wave) + ')'; ctx.fillRect(px, py, ts, ts);
+                if (d % 5 === 0) { ctx.fillStyle = 'rgba(100,150,200,0.15)';
+                    ctx.beginPath(); ctx.ellipse(px + ts / 2, py + ts / 2, 6 + d % 4, 3, d * 0.3, 0, Math.PI * 2); ctx.fill(); }
+                break;
+            case T.TREE:
+                var s = 22 + d % 8; ctx.fillStyle = 'rgb(' + (s + 5) + ',' + (s + 3) + ',' + s + ')'; ctx.fillRect(px, py, ts, ts);
+                ctx.fillStyle = '#2a1a0a'; ctx.fillRect(px + 12, py + 16, 8, 16);
+                ctx.fillStyle = 'rgb(' + (30 + d % 30) + ',' + (50 + d % 30) + ',25)';
+                ctx.beginPath(); ctx.arc(px + 16, py + 12, 10 + d % 4, 0, Math.PI * 2); ctx.fill();
+                break;
+            case T.BUSH:
+                var s = 22 + d % 8; ctx.fillStyle = 'rgb(' + (s + 5) + ',' + (s + 3) + ',' + s + ')'; ctx.fillRect(px, py, ts, ts);
+                ctx.fillStyle = 'rgb(' + (35 + d % 20) + ',' + (55 + d % 25) + ',30)';
+                ctx.beginPath(); ctx.arc(px + 16, py + 18, 8 + d % 3, 0, Math.PI * 2); ctx.fill();
+                if (d % 4 === 0) { ctx.fillStyle = '#c4c'; ctx.beginPath(); ctx.arc(px + 12 + d % 8, py + 14 + d % 6, 2, 0, Math.PI * 2); ctx.fill(); }
+                break;
+            case T.STRUCTURE:
+                ctx.fillStyle = '#2a2a2a'; ctx.fillRect(px, py, ts, ts);
+                break;
+            case T.FARM:
+                ctx.fillStyle = '#3a2a1a'; ctx.fillRect(px, py, ts, ts);
+                for (var i = 0; i < 3; i++) { ctx.strokeStyle = '#4a3a2a'; ctx.lineWidth = 1; ctx.beginPath();
+                    ctx.moveTo(px + 4, py + 8 + i * 10); ctx.lineTo(px + ts - 4, py + 8 + i * 10); ctx.stroke(); }
+                break;
+            default:
+                var s = 22 + d % 8; ctx.fillStyle = 'rgb(' + (s + 5) + ',' + (s + 3) + ',' + s + ')'; ctx.fillRect(px, py, ts, ts);
+                ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 0.5; ctx.strokeRect(px, py, ts, ts);
+                if (d % 13 === 0) { ctx.fillStyle = 'rgba(40,60,30,0.35)';
+                    ctx.beginPath(); ctx.arc(px + ts / 2, py + ts / 2, 3, 0, Math.PI * 2); ctx.fill(); }
         }
-
-        // Occasional pothole
-        if (d % 23 === 0) {
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.beginPath();
-            ctx.ellipse(px + ts / 2 + (d % 6 - 3), py + ts / 2 + (d % 8 - 4), 4 + d % 4, 3 + d % 3, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    },
-
-    _drawRuin(ctx, px, py, ts, d, tx, ty) {
-        var w = Game.Map.width;
-        // Determine if this is an edge or interior of a building block
-        var neighbors = 0;
-        if (ty > 0 && Game.Map.tiles[(ty-1)*w+tx] === Game.TileType.RUIN) neighbors |= 1; // top
-        if (tx < w-1 && Game.Map.tiles[ty*w+tx+1] === Game.TileType.RUIN) neighbors |= 2; // right
-        if (ty < Game.Map.height-1 && Game.Map.tiles[(ty+1)*w+tx] === Game.TileType.RUIN) neighbors |= 4; // bottom
-        if (tx > 0 && Game.Map.tiles[ty*w+tx-1] === Game.TileType.RUIN) neighbors |= 8; // left
-
-        // Building wall color - varies by block
-        var blockId = (Math.floor(tx / 6) * 7 + Math.floor(ty / 6)) % 5;
-        var colors = ['#3a3530', '#353040', '#30383a', '#3a3035', '#383530'];
-        var wallColor = colors[blockId];
-        ctx.fillStyle = wallColor;
-        ctx.fillRect(px, py, ts, ts);
-
-        // Darker interior
-        if (neighbors === 15) {
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.fillRect(px + 2, py + 2, ts - 4, ts - 4);
-
-            // Interior details (furniture/debris)
-            if (d % 5 === 0) {
-                ctx.fillStyle = 'rgba(80,60,40,0.4)';
-                ctx.fillRect(px + 6 + d % 10, py + 6 + d % 8, 8 + d % 6, 6 + d % 4);
-            }
-        }
-
-        // Draw wall edges facing non-ruin tiles
-        ctx.strokeStyle = '#555045';
-        ctx.lineWidth = 2;
-        if (!(neighbors & 1)) { // no ruin above - draw top wall
-            ctx.beginPath(); ctx.moveTo(px, py + 1); ctx.lineTo(px + ts, py + 1); ctx.stroke();
-            // Broken top edge
-            if (d % 4 === 0) {
-                ctx.fillStyle = wallColor;
-                ctx.fillRect(px + 8 + d % 12, py - 2, 6 + d % 5, 5);
-            }
-        }
-        if (!(neighbors & 4)) { // no ruin below
-            ctx.beginPath(); ctx.moveTo(px, py + ts - 1); ctx.lineTo(px + ts, py + ts - 1); ctx.stroke();
-        }
-        if (!(neighbors & 8)) { // no ruin left
-            ctx.beginPath(); ctx.moveTo(px + 1, py); ctx.lineTo(px + 1, py + ts); ctx.stroke();
-        }
-        if (!(neighbors & 2)) { // no ruin right
-            ctx.beginPath(); ctx.moveTo(px + ts - 1, py); ctx.lineTo(px + ts - 1, py + ts); ctx.stroke();
-        }
-
-        // Damage details on edges
-        if (d % 3 === 0 && neighbors !== 15) {
-            ctx.fillStyle = 'rgba(60,50,40,0.5)';
-            var debrisX = px + 4 + d % (ts - 8);
-            var debrisY = py + 4 + (d * 3) % (ts - 8);
-            ctx.fillRect(debrisX, debrisY, 3 + d % 4, 2 + d % 3);
-        }
-    },
-
-    _drawRubble(ctx, px, py, ts, d) {
-        // Cracked ground with scattered debris
-        var shade = 28 + (d % 12);
-        ctx.fillStyle = 'rgb(' + shade + ',' + (shade - 2) + ',' + (shade - 4) + ')';
-        ctx.fillRect(px, py, ts, ts);
-
-        // Scattered debris chunks
-        var numDebris = 1 + d % 3;
-        for (var i = 0; i < numDebris; i++) {
-            var dShade = 45 + ((d * (i + 3)) % 25);
-            ctx.fillStyle = 'rgb(' + dShade + ',' + (dShade - 5) + ',' + (dShade - 10) + ')';
-            var dx = 3 + ((d * (i + 1)) % (ts - 10));
-            var dy = 3 + ((d * (i + 2)) % (ts - 10));
-            var dw = 3 + (d + i) % 6;
-            var dh = 2 + (d + i * 2) % 5;
-            ctx.fillRect(px + dx, py + dy, dw, dh);
-        }
-
-        // Rebar/wire details
-        if (d % 8 === 0) {
-            ctx.strokeStyle = 'rgba(120,80,50,0.4)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(px + d % 16 + 4, py + d % 12 + 2);
-            ctx.lineTo(px + ts - d % 12 - 4, py + ts - d % 10 - 2);
-            ctx.stroke();
-        }
-    },
-
-    _drawGround(ctx, px, py, ts, d) {
-        // Cracked dirt/concrete
-        var shade = 22 + (d % 8);
-        ctx.fillStyle = 'rgb(' + (shade + 5) + ',' + (shade + 3) + ',' + shade + ')';
-        ctx.fillRect(px, py, ts, ts);
-
-        // Subtle grid crack
-        ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(px, py, ts, ts);
-
-        // Occasional weed/grass patch
-        if (d % 11 === 0) {
-            ctx.fillStyle = 'rgba(40,60,30,0.4)';
-            ctx.beginPath();
-            ctx.arc(px + ts / 2 + d % 8 - 4, py + ts / 2 + d % 6 - 3, 3 + d % 3, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    },
-
-    _drawBase(ctx, px, py, ts, d) {
-        // Fortified base
-        ctx.fillStyle = '#334';
-        ctx.fillRect(px, py, ts, ts);
-        ctx.fillStyle = '#445';
-        ctx.fillRect(px + 2, py + 2, ts - 4, ts - 4);
-
-        // Metal plate pattern
-        ctx.strokeStyle = '#556';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(px + 4, py + 4, ts - 8, ts - 8);
-
-        // Rivets
-        ctx.fillStyle = '#667';
-        var corners = [[6, 6], [ts - 8, 6], [6, ts - 8], [ts - 8, ts - 8]];
-        for (var i = 0; i < corners.length; i++) {
-            ctx.beginPath();
-            ctx.arc(px + corners[i][0], py + corners[i][1], 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    },
-
-    _drawSpawn(ctx, px, py, ts, d) {
-        // Ominous spawn portal
-        ctx.fillStyle = '#1a0505';
-        ctx.fillRect(px, py, ts, ts);
-        ctx.fillStyle = '#3a1010';
-        ctx.fillRect(px + 3, py + 3, ts - 6, ts - 6);
-        ctx.strokeStyle = '#622';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(px + 3, py + 3, ts - 6, ts - 6);
-    },
-
-    _drawRoadMarkings(ctx, ts, w, h) {
-        ctx.strokeStyle = 'rgba(180,170,100,0.12)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([6, 8]);
-
-        // Draw dashed center lines on wider road stretches
-        for (var y = 0; y < h; y++) {
-            var runStart = -1;
-            for (var x = 0; x < w; x++) {
-                if (Game.Map.getTile(x, y) === Game.TileType.ROAD) {
-                    if (runStart === -1) runStart = x;
-                } else {
-                    if (runStart !== -1 && (x - runStart) >= 3) {
-                        ctx.beginPath();
-                        ctx.moveTo(runStart * ts, y * ts + ts / 2);
-                        ctx.lineTo(x * ts, y * ts + ts / 2);
-                        ctx.stroke();
-                    }
-                    runStart = -1;
-                }
-            }
-        }
-        for (var x = 0; x < w; x++) {
-            var runStart = -1;
-            for (var y = 0; y < h; y++) {
-                if (Game.Map.getTile(x, y) === Game.TileType.ROAD) {
-                    if (runStart === -1) runStart = y;
-                } else {
-                    if (runStart !== -1 && (y - runStart) >= 3) {
-                        ctx.beginPath();
-                        ctx.moveTo(x * ts + ts / 2, runStart * ts);
-                        ctx.lineTo(x * ts + ts / 2, y * ts);
-                        ctx.stroke();
-                    }
-                    runStart = -1;
-                }
-            }
-        }
-        ctx.setLineDash([]);
     },
 
     draw(ctx) {
-        var cam = Game.Camera;
-        var shake = cam.getShakeOffset();
-        var offX = Math.round(cam.x) + shake.x;
-        var offY = Math.round(cam.y) + shake.y;
+        var cam = Game.Camera, shake = cam.getShakeOffset();
+        var offX = Math.round(cam.x) + shake.x, offY = Math.round(cam.y) + shake.y;
+        var cs = Game.Config.CHUNK_SIZE, ts = Game.Config.TILE_SIZE, cpx = cs * ts;
+        var startCX = Math.max(0, Math.floor(offX / cpx) - 1), endCX = Math.min(Game.Config.WORLD_CHUNKS - 1, Math.ceil((offX + cam.screenW) / cpx) + 1);
+        var startCY = Math.max(0, Math.floor(offY / cpx) - 1), endCY = Math.min(Game.Config.WORLD_CHUNKS - 1, Math.ceil((offY + cam.screenH) / cpx) + 1);
 
-        if (Game.Map.groundDirty) {
-            this.renderGround();
+        for (var cy = startCY; cy <= endCY; cy++) {
+            for (var cx = startCX; cx <= endCX; cx++) {
+                var chunkCanvas = this.getChunkCanvas(cx, cy);
+                ctx.drawImage(chunkCanvas, cx * cpx - offX, cy * cpx - offY);
+            }
         }
 
-        // Draw ground layer
-        ctx.drawImage(this.groundCanvas, -offX, -offY);
+        // Structures
+        for (var i = 0; i < Game.World.structures.length; i++) {
+            var s = Game.World.structures[i];
+            if (!cam.isVisible(s.x, s.y, 40)) continue;
+            this.drawStructure(ctx, s, offX, offY);
+        }
 
-        // Walls
-        this.drawWalls(ctx, offX, offY);
-
-        // Turret bases
-        this.drawTurrets(ctx, offX, offY);
-
-        // Zombies (sorted by y for depth)
-        this.drawZombies(ctx, offX, offY);
+        // Zombies
+        var zombies = Game.ZombieManager.pool.active.slice().sort(function(a, b) { return a.y - b.y; });
+        for (var i = 0; i < zombies.length; i++) { var z = zombies[i]; if (z.alive && cam.isVisible(z.x, z.y)) this.drawZombie(ctx, z, offX, offY); }
 
         // Player
         this.drawPlayer(ctx, offX, offY);
 
         // Bullets
-        this.drawBullets(ctx, offX, offY);
-
-        // Turret barrels (drawn on top)
-        this.drawTurretBarrels(ctx, offX, offY);
+        ctx.fillStyle = '#ff8';
+        Game.BulletManager.pool.forEach(function(b) { if (!cam.isVisible(b.x, b.y)) return;
+            ctx.beginPath(); ctx.arc(b.x - offX, b.y - offY, 3, 0, Math.PI * 2); ctx.fill(); });
 
         // Particles
-        this.drawParticles(ctx, offX, offY);
+        Game.ParticleManager.pool.forEach(function(p) { if (!cam.isVisible(p.x, p.y)) return;
+            var a = Math.max(0, p.life / p.maxLife); ctx.globalAlpha = a; ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x - offX, p.y - offY, p.size * a, 0, Math.PI * 2); ctx.fill(); });
+        ctx.globalAlpha = 1;
 
-        // Health bars above damaged entities
-        this.drawHealthBars(ctx, offX, offY);
-
-        // Station indicator during build phase
-        if (Game.Phase.current === 'build') {
-            this.drawStation(ctx, offX, offY);
-        }
-
-        // Ambient darkness at edges (vignette)
-        this._drawVignette(ctx);
-    },
-
-    _drawVignette(ctx) {
-        var sw = Game.Config.INTERNAL_WIDTH;
-        var sh = Game.Config.INTERNAL_HEIGHT;
-        var grad = ctx.createRadialGradient(sw / 2, sh / 2, sh * 0.3, sw / 2, sh / 2, sh * 0.7);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.35)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, sw, sh);
-    },
-
-    drawWalls(ctx, offX, offY) {
-        var ts = Game.Config.TILE_SIZE;
-        for (var i = 0; i < Game.WallManager.walls.length; i++) {
-            var w = Game.WallManager.walls[i];
-            if (!Game.Camera.isVisible(w.x, w.y, ts)) continue;
-            var sx = w.x - ts / 2 - offX;
-            var sy = w.y - ts / 2 - offY;
-
-            // Sandbag/barricade look
-            ctx.fillStyle = '#6a5a3a';
-            ctx.fillRect(sx + 1, sy + 1, ts - 2, ts - 2);
-
-            // Sandbag texture lines
-            ctx.strokeStyle = '#7a6a4a';
-            ctx.lineWidth = 1;
-            for (var ly = 0; ly < 3; ly++) {
-                ctx.beginPath();
-                ctx.moveTo(sx + 2, sy + 4 + ly * 10);
-                ctx.lineTo(sx + ts - 2, sy + 4 + ly * 10);
-                ctx.stroke();
-            }
-
-            ctx.strokeStyle = '#8a7a50';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(sx + 1, sy + 1, ts - 2, ts - 2);
-
-            // Damage cracks
-            var hpPct = w.health / w.maxHealth;
-            if (hpPct < 0.6) {
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(sx + 8, sy + 5);
-                ctx.lineTo(sx + ts / 2, sy + ts / 2);
-                ctx.lineTo(sx + ts - 8, sy + ts - 5);
-                ctx.stroke();
-            }
+        // Day/night overlay
+        if (Game.Survival.darkness > 0) {
+            // Dark overlay with light circle around player
+            var sw = Game.Config.INTERNAL_WIDTH, sh = Game.Config.INTERNAL_HEIGHT;
+            var ps = cam.worldToScreen(Game.Player.x, Game.Player.y);
+            var grad = ctx.createRadialGradient(ps.x, ps.y, 40, ps.x, ps.y, 200);
+            grad.addColorStop(0, 'rgba(5,5,20,0)');
+            grad.addColorStop(1, 'rgba(5,5,20,' + (Game.Survival.darkness * 0.7) + ')');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, sw, sh);
+            // Additional overall darkness
+            ctx.fillStyle = 'rgba(5,5,20,' + (Game.Survival.darkness * 0.3) + ')';
+            ctx.fillRect(0, 0, sw, sh);
         }
     },
 
-    drawTurrets(ctx, offX, offY) {
-        var ts = Game.Config.TILE_SIZE;
-        for (var i = 0; i < Game.TurretManager.turrets.length; i++) {
-            var t = Game.TurretManager.turrets[i];
-            if (!Game.Camera.isVisible(t.x, t.y, ts)) continue;
-            var sx = t.x - offX;
-            var sy = t.y - offY;
-            var cfg = Game.Config.TURRET_TYPES[t.type];
-
-            // Base platform
-            ctx.fillStyle = '#444';
-            ctx.beginPath();
-            ctx.arc(sx, sy, 12, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Type color ring
-            ctx.strokeStyle = cfg.color;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(sx, sy, 12, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // Level dots
-            for (var j = 0; j < t.level; j++) {
-                ctx.fillStyle = '#ff0';
-                ctx.beginPath();
-                var dotAngle = (-Math.PI / 2) + (j - (t.level - 1) / 2) * 0.5;
-                ctx.arc(sx + Math.cos(dotAngle) * 8, sy + Math.sin(dotAngle) * 8, 2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // Range circle when selected
-            if (Game.Phase.current === 'build' && Game.Phase.radial.mode !== 'none' &&
-                Game.Phase.radial.turret === t) {
-                var upgr = Game.Config.UPGRADE_LEVELS[t.level];
-                var range = cfg.range * upgr.range;
-                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(sx, sy, range, 0, Math.PI * 2);
-                ctx.stroke();
-            }
+    drawStructure(ctx, s, offX, offY) {
+        var sx = s.x - offX, sy = s.y - offY, ts = Game.Config.TILE_SIZE;
+        switch (s.type) {
+            case 'wall':
+                ctx.fillStyle = '#6a5a3a'; ctx.fillRect(sx - ts / 2 + 1, sy - ts / 2 + 1, ts - 2, ts - 2);
+                ctx.strokeStyle = '#8a7a50'; ctx.lineWidth = 2; ctx.strokeRect(sx - ts / 2 + 1, sy - ts / 2 + 1, ts - 2, ts - 2);
+                break;
+            case 'door':
+                ctx.fillStyle = '#7a6a4a'; ctx.fillRect(sx - ts / 2 + 4, sy - ts / 2 + 2, ts - 8, ts - 4);
+                ctx.fillStyle = '#da8'; ctx.beginPath(); ctx.arc(sx + 6, sy, 2, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'turret_gun': case 'turret_shotgun':
+                ctx.fillStyle = '#444'; ctx.beginPath(); ctx.arc(sx, sy, 12, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = s.type === 'turret_gun' ? '#4af' : '#fa4'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(sx, sy, 12, 0, Math.PI * 2); ctx.stroke();
+                ctx.strokeStyle = s.type === 'turret_gun' ? '#4af' : '#fa4'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(s.angle) * 14, sy + Math.sin(s.angle) * 14); ctx.stroke();
+                break;
+            case 'campfire':
+                ctx.fillStyle = '#432'; ctx.beginPath(); ctx.arc(sx, sy, 10, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#f84'; ctx.beginPath(); ctx.arc(sx, sy - 2, 5, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#ff4'; ctx.beginPath(); ctx.arc(sx, sy - 4, 3, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'rain_collector':
+                ctx.fillStyle = '#556'; ctx.fillRect(sx - 10, sy - 10, 20, 20);
+                ctx.fillStyle = '#48a'; ctx.fillRect(sx - 6, sy - 6, 12, 12 * Math.min(1, (s.data.water || 0) / (s.data.maxWater || 1)));
+                break;
+            case 'well':
+                ctx.fillStyle = '#665'; ctx.beginPath(); ctx.arc(sx, sy, 12, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#887'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, 12, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = '#338'; ctx.beginPath(); ctx.arc(sx, sy, 6, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'farm_plot':
+                if (s.data.crop) {
+                    var cropCfg = Game.Config.CROPS[s.data.crop];
+                    var pct = cropCfg ? s.data.growth / cropCfg.growTime : 0;
+                    ctx.fillStyle = cropCfg ? cropCfg.icon : '#6a4';
+                    var h = Math.max(4, 16 * Math.min(1, pct));
+                    ctx.fillRect(sx - 4, sy + 8 - h, 8, h);
+                    if (pct >= 1) { ctx.fillStyle = '#ff4'; ctx.font = '8px monospace'; ctx.textAlign = 'center'; ctx.fillText('!', sx, sy - 8); }
+                }
+                break;
+            case 'storage':
+                ctx.fillStyle = '#654'; ctx.fillRect(sx - 10, sy - 8, 20, 16);
+                ctx.strokeStyle = '#876'; ctx.lineWidth = 1; ctx.strokeRect(sx - 10, sy - 8, 20, 16);
+                break;
+            case 'purifier':
+                ctx.fillStyle = '#456'; ctx.fillRect(sx - 10, sy - 10, 20, 20);
+                ctx.fillStyle = '#48f'; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.fill();
+                break;
+        }
+        // Health bar if damaged
+        if (s.health < s.maxHealth) {
+            var barW = 20; ctx.fillStyle = '#300'; ctx.fillRect(sx - barW / 2, sy - 18, barW, 3);
+            ctx.fillStyle = '#fa4'; ctx.fillRect(sx - barW / 2, sy - 18, barW * (s.health / s.maxHealth), 3);
         }
     },
 
-    drawTurretBarrels(ctx, offX, offY) {
-        for (var i = 0; i < Game.TurretManager.turrets.length; i++) {
-            var t = Game.TurretManager.turrets[i];
-            if (!Game.Camera.isVisible(t.x, t.y)) continue;
-            var sx = t.x - offX;
-            var sy = t.y - offY;
-            var cfg = Game.Config.TURRET_TYPES[t.type];
-
-            ctx.strokeStyle = cfg.color;
-            ctx.lineWidth = t.type === 'sniper' ? 2 : 3;
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(sx + Math.cos(t.angle) * cfg.barrelLen, sy + Math.sin(t.angle) * cfg.barrelLen);
-            ctx.stroke();
-
-            if (t.type === 'shotgun') {
-                ctx.lineWidth = 5;
-                var endX = sx + Math.cos(t.angle) * cfg.barrelLen;
-                var endY = sy + Math.sin(t.angle) * cfg.barrelLen;
-                ctx.beginPath();
-                ctx.moveTo(endX - Math.cos(t.angle) * 3, endY - Math.sin(t.angle) * 3);
-                ctx.lineTo(endX, endY);
-                ctx.stroke();
-            }
-        }
-    },
-
-    drawZombies(ctx, offX, offY) {
-        var zombies = Game.ZombieManager.pool.active.slice().sort(function(a, b) { return a.y - b.y; });
-
-        for (var i = 0; i < zombies.length; i++) {
-            var z = zombies[i];
-            if (!z.alive || !Game.Camera.isVisible(z.x, z.y)) continue;
-            var sx = z.x - offX;
-            var sy = z.y - offY;
-
-            // Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy + z.radius * 0.6, z.radius * 0.8, z.radius * 0.3, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Body
-            ctx.fillStyle = z.color;
-            ctx.beginPath();
-            ctx.arc(sx, sy, z.radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Eyes
-            var faceAngle = 0;
-            if (z.path && z.pathIndex < z.path.length) {
-                var target = z.path[z.pathIndex];
-                faceAngle = Math.atan2(target.y - z.y, target.x - z.x);
-            }
-            ctx.fillStyle = '#f00';
-            var eyeOff = z.radius * 0.4;
-            var eyeR = z.type === 'tank' ? 3 : 2;
-            ctx.beginPath();
-            ctx.arc(sx + Math.cos(faceAngle - 0.4) * eyeOff, sy + Math.sin(faceAngle - 0.4) * eyeOff, eyeR, 0, Math.PI * 2);
-            ctx.arc(sx + Math.cos(faceAngle + 0.4) * eyeOff, sy + Math.sin(faceAngle + 0.4) * eyeOff, eyeR, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Health bar
-            if (z.health < z.maxHealth) {
-                var barW = z.radius * 2;
-                var barH = 3;
-                var bx = sx - barW / 2;
-                var by = sy - z.radius - 6;
-                ctx.fillStyle = '#300';
-                ctx.fillRect(bx, by, barW, barH);
-                ctx.fillStyle = '#f44';
-                ctx.fillRect(bx, by, barW * (z.health / z.maxHealth), barH);
-            }
+    drawZombie(ctx, z, offX, offY) {
+        var sx = z.x - offX, sy = z.y - offY;
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(sx, sy + z.radius * 0.6, z.radius * 0.7, z.radius * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = z.color; ctx.beginPath(); ctx.arc(sx, sy, z.radius, 0, Math.PI * 2); ctx.fill();
+        var fa = Math.atan2(Game.Player.y - z.y, Game.Player.x - z.x);
+        ctx.fillStyle = z.aggroed ? '#f00' : '#a00';
+        var eo = z.radius * 0.4, er = z.type === 'brute' ? 3 : 2;
+        ctx.beginPath(); ctx.arc(sx + Math.cos(fa - 0.4) * eo, sy + Math.sin(fa - 0.4) * eo, er, 0, Math.PI * 2);
+        ctx.arc(sx + Math.cos(fa + 0.4) * eo, sy + Math.sin(fa + 0.4) * eo, er, 0, Math.PI * 2); ctx.fill();
+        if (z.health < z.maxHealth) {
+            var bw = z.radius * 2; ctx.fillStyle = '#300'; ctx.fillRect(sx - bw / 2, sy - z.radius - 6, bw, 3);
+            ctx.fillStyle = '#f44'; ctx.fillRect(sx - bw / 2, sy - z.radius - 6, bw * (z.health / z.maxHealth), 3);
         }
     },
 
     drawPlayer(ctx, offX, offY) {
-        var p = Game.Player;
-        var sx = p.x - offX;
-        var sy = p.y - offY;
-
-        // Player shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.beginPath();
-        ctx.ellipse(sx, sy + p.radius * 0.5, p.radius * 0.8, p.radius * 0.3, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (Game.Phase.current === 'combat') {
-            // Mounted gun station
-            ctx.fillStyle = '#444';
-            ctx.fillRect(sx - 16, sy - 16, 32, 32);
-            ctx.strokeStyle = '#666';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(sx - 16, sy - 16, 32, 32);
-
-            ctx.fillStyle = '#48f';
-            ctx.beginPath();
-            ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.strokeStyle = '#adf';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(sx + Math.cos(p.aimAngle) * 22, sy + Math.sin(p.aimAngle) * 22);
-            ctx.stroke();
-        } else {
-            ctx.fillStyle = '#48f';
-            ctx.beginPath();
-            ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            var joy = Game.Input.joystick;
-            if (joy.dx !== 0 || joy.dy !== 0) {
-                ctx.strokeStyle = '#8bf';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(sx, sy);
-                ctx.lineTo(sx + joy.dx * 16, sy + joy.dy * 16);
-                ctx.stroke();
-            }
-
-            ctx.strokeStyle = '#adf';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-    },
-
-    drawBullets(ctx, offX, offY) {
-        ctx.fillStyle = '#ff8';
-        Game.BulletManager.pool.forEach(function(b) {
-            if (!Game.Camera.isVisible(b.x, b.y)) return;
-            var sx = b.x - offX;
-            var sy = b.y - offY;
-            ctx.beginPath();
-            ctx.arc(sx, sy, 3, 0, Math.PI * 2);
-            ctx.fill();
-        });
-    },
-
-    drawParticles(ctx, offX, offY) {
-        Game.ParticleManager.pool.forEach(function(p) {
-            if (!Game.Camera.isVisible(p.x, p.y)) return;
-            var sx = p.x - offX;
-            var sy = p.y - offY;
-            var alpha = Math.max(0, p.life / p.maxLife);
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.arc(sx, sy, p.size * alpha, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        ctx.globalAlpha = 1;
-    },
-
-    drawHealthBars(ctx, offX, offY) {
-        var ts = Game.Config.TILE_SIZE;
-        for (var i = 0; i < Game.WallManager.walls.length; i++) {
-            var w = Game.WallManager.walls[i];
-            if (w.health >= w.maxHealth || !Game.Camera.isVisible(w.x, w.y)) continue;
-            var sx = w.x - offX;
-            var sy = w.y - offY;
-            var barW = ts - 8;
-            ctx.fillStyle = '#300';
-            ctx.fillRect(sx - barW / 2, sy - ts / 2 - 5, barW, 3);
-            ctx.fillStyle = '#fa4';
-            ctx.fillRect(sx - barW / 2, sy - ts / 2 - 5, barW * (w.health / w.maxHealth), 3);
-        }
-
-        for (var i = 0; i < Game.TurretManager.turrets.length; i++) {
-            var t = Game.TurretManager.turrets[i];
-            if (t.health >= t.maxHealth || !Game.Camera.isVisible(t.x, t.y)) continue;
-            var sx = t.x - offX;
-            var sy = t.y - offY;
-            var barW = 20;
-            ctx.fillStyle = '#300';
-            ctx.fillRect(sx - barW / 2, sy - 18, barW, 3);
-            ctx.fillStyle = '#4af';
-            ctx.fillRect(sx - barW / 2, sy - 18, barW * (t.health / t.maxHealth), 3);
-        }
-    },
-
-    drawStation(ctx, offX, offY) {
-        var sp = Game.Map.stationPos;
-        var sx = sp.x - offX;
-        var sy = sp.y - offY;
-
-        var pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
-        ctx.strokeStyle = 'rgba(100, 150, 255, ' + (0.3 + pulse * 0.3) + ')';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.strokeRect(sx - 18, sy - 18, 36, 36);
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = 'rgba(100, 150, 255, ' + (0.1 + pulse * 0.1) + ')';
-        ctx.fillRect(sx - 18, sy - 18, 36, 36);
-
-        ctx.fillStyle = '#89b';
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('GUN', sx, sy + 3);
+        var p = Game.Player, sx = p.x - offX, sy = p.y - offY;
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(sx, sy + p.radius * 0.5, p.radius * 0.7, p.radius * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#48f'; ctx.beginPath(); ctx.arc(sx, sy, p.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#adf'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, p.radius, 0, Math.PI * 2); ctx.stroke();
+        // Weapon line
+        var angle = Game.Input.aim.active ? p.aimAngle : p.facingAngle;
+        var wCfg = p.weapon ? Game.Config.ITEMS[p.weapon] : Game.Config.ITEMS.fists;
+        var len = wCfg.range ? Math.min(wCfg.range, 22) : 12;
+        ctx.strokeStyle = p.weapon ? '#ddd' : '#8bf'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len); ctx.stroke();
     }
 };
