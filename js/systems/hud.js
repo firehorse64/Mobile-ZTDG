@@ -10,6 +10,7 @@ Game.HUD = {
     draw(ctx) {
         var sw = Game.Config.INTERNAL_WIDTH, sh = Game.Config.INTERNAL_HEIGHT;
         ctx.save();
+        this._buttons = [];
         if (this.screen === 'none') this.drawGameHUD(ctx, sw, sh);
         else if (this.screen === 'inventory') this.drawInventory(ctx, sw, sh);
         else if (this.screen === 'crafting') this.drawCrafting(ctx, sw, sh);
@@ -17,6 +18,8 @@ Game.HUD = {
         else if (this.screen === 'map') this.drawMap(ctx, sw, sh);
         else if (this.screen === 'menu') this.drawMenu(ctx, sw, sh);
         else if (this.screen === 'build') this.drawBuild(ctx, sw, sh);
+        // Always draw action buttons on top
+        this.drawActionButtons(ctx, sw, sh);
         // Floating message
         if (this.messageTimer > 0) {
             var a = Math.min(1, this.messageTimer / 500);
@@ -28,7 +31,8 @@ Game.HUD = {
     },
 
     handleTap(x, y) {
-        for (var i = 0; i < this._buttons.length; i++) {
+        // Check in reverse order so buttons drawn on top (action buttons) get priority
+        for (var i = this._buttons.length - 1; i >= 0; i--) {
             var b = this._buttons[i];
             if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) {
                 if (b.action) b.action();
@@ -57,7 +61,6 @@ Game.HUD = {
     },
 
     drawGameHUD(ctx, sw, sh) {
-        this._buttons = [];
         var p = Game.Player, c = Game.Config;
 
         // Status bars - top
@@ -121,22 +124,8 @@ Game.HUD = {
             }; })(idx) });
         }
 
-        // Action buttons - right side
-        var abSize = 36, abX = sw - abSize - 5, abY = sh - 200;
-        var self = this;
-        var actions = [
-            ['BAG', '#456', function() { self.screen = 'inventory'; }],
-            ['CRFT', '#464', function() { self.craftStation = null; self.craftScroll = 0; self.screen = 'crafting'; }],
-            ['SKIL', '#654', function() { self.screen = 'skills'; }],
-            ['MAP', '#446', function() { self.screen = 'map'; }],
-            ['MENU', '#444', function() { self.screen = 'menu'; }],
-            ['BLD', '#554', function() { self.selectedBuildItem = null; self.screen = 'build'; }]
-        ];
-        for (var i = 0; i < actions.length; i++) {
-            this._btn(ctx, abX, abY + i * (abSize + 4), abSize, abSize, actions[i][0], actions[i][1], actions[i][2]);
-        }
-
         // Context buttons - search/use
+        var self = this;
         var tile = Game.World.worldToTile(p.x, p.y);
         // Check adjacent tiles for scavenge
         var canSearch = false;
@@ -198,12 +187,10 @@ Game.HUD = {
     },
 
     drawInventory(ctx, sw, sh) {
-        this._buttons = [];
         var self = this;
-        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, sw - 20, sh - 20);
+        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, sw - 60, sh - 20);
         ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
         ctx.fillText('INVENTORY', sw / 2, 35);
-        this._btn(ctx, sw - 50, 14, 30, 24, 'X', '#633', function() { self.screen = 'none'; });
 
         // Weapon slot
         ctx.fillStyle = '#333'; ctx.fillRect(20, 45, sw - 40, 35);
@@ -251,13 +238,11 @@ Game.HUD = {
     },
 
     drawCrafting(ctx, sw, sh) {
-        this._buttons = [];
         var self = this;
-        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, sw - 20, sh - 20);
+        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, sw - 60, sh - 20);
         var title = this.craftStation ? this.craftStation.toUpperCase() + ' CRAFTING' : 'CRAFTING';
         ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
         ctx.fillText(title, sw / 2, 35);
-        this._btn(ctx, sw - 50, 14, 30, 24, 'X', '#633', function() { self.screen = 'none'; });
 
         var recipes = Game.Crafting.getAvailableRecipes(this.craftStation);
         var itemH = 55, startY = 50 - this.craftScroll, maxY = sh - 30;
@@ -293,12 +278,10 @@ Game.HUD = {
     },
 
     drawSkills(ctx, sw, sh) {
-        this._buttons = [];
         var self = this, p = Game.Player;
-        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, sw - 20, sh - 20);
+        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(10, 10, sw - 60, sh - 20);
         ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
         ctx.fillText('SKILLS  (Points: ' + p.skillPoints + ')', sw / 2, 35);
-        this._btn(ctx, sw - 50, 14, 30, 24, 'X', '#633', function() { self.screen = 'none'; });
 
         var trees = ['combat', 'survival', 'building', 'farming'];
         var ty = 50, treeH = (sh - 80) / 4;
@@ -323,12 +306,10 @@ Game.HUD = {
     },
 
     drawMap(ctx, sw, sh) {
-        this._buttons = [];
         var self = this;
-        ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(10, 10, sw - 20, sh - 20);
+        ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(10, 10, sw - 60, sh - 20);
         ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
         ctx.fillText('MAP', sw / 2, 35);
-        this._btn(ctx, sw - 50, 14, 30, 24, 'X', '#633', function() { self.screen = 'none'; });
 
         var wc = Game.Config.WORLD_CHUNKS, cs = Game.Config.CHUNK_SIZE;
         var mapSize = Math.min(sw - 40, sh - 80);
@@ -361,7 +342,6 @@ Game.HUD = {
     },
 
     drawMenu(ctx, sw, sh) {
-        this._buttons = [];
         var self = this;
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(sw / 2 - 100, sh / 2 - 120, 200, 240);
         ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
@@ -378,16 +358,13 @@ Game.HUD = {
         this._btn(ctx, sw / 2 - 80, by + 88, 160, 36, 'NEW GAME', '#633', function() {
             Game.State.newGame(); self.screen = 'none';
         });
-        this._btn(ctx, sw / 2 - 80, by + 140, 160, 36, 'CLOSE', '#444', function() { self.screen = 'none'; });
     },
 
     drawBuild(ctx, sw, sh) {
-        this._buttons = [];
         var self = this;
         ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, sh - 90, sw, 90);
         ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
         ctx.fillText('BUILD MODE - Tap tile to place', sw / 2, sh - 75);
-        this._btn(ctx, sw - 70, sh - 88, 60, 22, 'CANCEL', '#633', function() { self.screen = 'none'; });
 
         // Show buildable items from inventory
         var buildItems = [];
@@ -423,6 +400,50 @@ Game.HUD = {
             var canPlace = Game.World.canBuild(tile.x, tile.y) || (self.selectedBuildItem === 'farm_plot' && Game.World.canFarm(tile.x, tile.y));
             ctx.strokeStyle = canPlace ? '#4f4' : '#f44'; ctx.lineWidth = 2;
             ctx.strokeRect(tileScreen.x - ts / 2, tileScreen.y - ts / 2, ts, ts);
+        }
+    },
+
+    drawActionButtons(ctx, sw, sh) {
+        var abSize = 36, abX = sw - abSize - 5, abY = sh - 250;
+        var self = this;
+        var screenMap = {
+            'BAG': 'inventory', 'CRFT': 'crafting', 'SKIL': 'skills',
+            'MAP': 'map', 'MENU': 'menu', 'BLD': 'build'
+        };
+        var actions = [
+            ['BAG', '#456'],
+            ['CRFT', '#464'],
+            ['SKIL', '#654'],
+            ['MAP', '#446'],
+            ['MENU', '#444'],
+            ['BLD', '#554']
+        ];
+        // Background strip behind buttons
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.fillRect(abX - 3, abY - 3, abSize + 6, actions.length * (abSize + 4) + 2);
+        for (var i = 0; i < actions.length; i++) {
+            var label = actions[i][0], baseColor = actions[i][1];
+            var targetScreen = screenMap[label];
+            var isActive = this.screen === targetScreen;
+            var color = isActive ? '#8af' : baseColor;
+            var by = abY + i * (abSize + 4);
+            // Draw button
+            ctx.fillStyle = isActive ? '#234' : (color || '#333');
+            ctx.fillRect(abX, by, abSize, abSize);
+            ctx.strokeStyle = isActive ? '#8af' : '#888'; ctx.lineWidth = isActive ? 2 : 1;
+            ctx.strokeRect(abX, by, abSize, abSize);
+            ctx.fillStyle = isActive ? '#8af' : '#fff';
+            ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+            ctx.fillText(label, abX + abSize / 2, by + abSize / 2 + 4);
+            this._buttons.push({ x: abX, y: by, w: abSize, h: abSize, action: (function(scr) { return function() {
+                if (self.screen === scr) {
+                    self.screen = 'none';
+                } else {
+                    if (scr === 'crafting') { self.craftStation = null; self.craftScroll = 0; }
+                    if (scr === 'build') { self.selectedBuildItem = null; }
+                    self.screen = scr;
+                }
+            }; })(targetScreen) });
         }
     },
 
