@@ -176,13 +176,13 @@ Game.HUD = {
             ctx.beginPath(); ctx.arc(j.startX + j.dx * r, j.startY + j.dy * r, 18, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Crosshair
+        // Aim joystick visual
         if (Game.Input.aim.active) {
-            var ax = Game.Input.aim.x, ay = Game.Input.aim.y;
-            ctx.strokeStyle = 'rgba(255,80,80,0.5)'; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.arc(ax, ay, 12, 0, Math.PI * 2); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(ax - 16, ay); ctx.lineTo(ax + 16, ay);
-            ctx.moveTo(ax, ay - 16); ctx.lineTo(ax, ay + 16); ctx.stroke();
+            var a = Game.Input.aim, r = Game.Config.JOYSTICK_RADIUS;
+            ctx.fillStyle = 'rgba(255,80,80,0.08)'; ctx.strokeStyle = 'rgba(255,80,80,0.25)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(a.startX, a.startY, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,80,80,0.35)';
+            ctx.beginPath(); ctx.arc(a.startX + a.dx * r, a.startY + a.dy * r, 18, 0, Math.PI * 2); ctx.fill();
         }
     },
 
@@ -390,15 +390,15 @@ Game.HUD = {
             bx += bw + 4;
         }
 
-        // Handle world tap for placement
-        if (self.selectedBuildItem && Game.Input.aim.active) {
-            var world = Game.Camera.screenToWorld(Game.Input.aim.x, Game.Input.aim.y);
-            var tile = Game.World.worldToTile(world.x, world.y);
-            // Highlight tile
-            var tileScreen = Game.Camera.worldToScreen(tile.x * Game.Config.TILE_SIZE + Game.Config.TILE_SIZE / 2, tile.y * Game.Config.TILE_SIZE + Game.Config.TILE_SIZE / 2);
-            var ts = Game.Config.TILE_SIZE;
+        // Build placement hint - highlight tile in front of player
+        if (self.selectedBuildItem) {
+            var pa = Game.Player.facingAngle, ts = Game.Config.TILE_SIZE;
+            var frontX = Game.Player.x + Math.cos(pa) * ts * 1.5;
+            var frontY = Game.Player.y + Math.sin(pa) * ts * 1.5;
+            var tile = Game.World.worldToTile(frontX, frontY);
+            var tileScreen = Game.Camera.worldToScreen(tile.x * ts + ts / 2, tile.y * ts + ts / 2);
             var canPlace = Game.World.canBuild(tile.x, tile.y) || (self.selectedBuildItem === 'farm_plot' && Game.World.canFarm(tile.x, tile.y));
-            ctx.strokeStyle = canPlace ? '#4f4' : '#f44'; ctx.lineWidth = 2;
+            ctx.strokeStyle = canPlace ? 'rgba(80,255,80,0.5)' : 'rgba(255,80,80,0.5)'; ctx.lineWidth = 2;
             ctx.strokeRect(tileScreen.x - ts / 2, tileScreen.y - ts / 2, ts, ts);
         }
     },

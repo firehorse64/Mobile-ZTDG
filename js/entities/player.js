@@ -67,14 +67,14 @@ Game.Player = {
         if(!this.sprinting) this.stamina=Math.min(this.getMaxStamina(),this.stamina+c.STAMINA_REGEN);
 
         // Aim
-        if(Game.Input.aim.active) {
-            var sp=Game.Camera.worldToScreen(this.x,this.y);
-            this.aimAngle=Math.atan2(Game.Input.aim.y-sp.y,Game.Input.aim.x-sp.x);
+        if(Game.Input.aim.active && (Game.Input.aim.dx!==0||Game.Input.aim.dy!==0)) {
+            this.aimAngle=Math.atan2(Game.Input.aim.dy,Game.Input.aim.dx);
         }
 
         // Attack
         if(this.attackCooldown>0) this.attackCooldown-=dt;
-        if(Game.Input.aim.active && this.attackCooldown<=0 && !Game.HUD.isScreenOpen()) {
+        var aimPushed = Game.Input.aim.active && (Game.Input.aim.dx!==0||Game.Input.aim.dy!==0);
+        if(aimPushed && this.attackCooldown<=0 && !Game.HUD.isScreenOpen()) {
             this.attack();
         }
 
