@@ -5,6 +5,7 @@ Game.Player = {
     xp:0,level:1,skillPoints:0,
     weapon:null, // item id of equipped weapon
     attackCooldown:0,sprinting:false,
+    slashTimer:0,slashAngle:0,slashRange:0,
     skills:{combat:[0,0,0,0],survival:[0,0,0,0],building:[0,0,0,0],farming:[0,0,0,0]},
 
     init() {
@@ -71,6 +72,9 @@ Game.Player = {
             this.aimAngle=Math.atan2(Game.Input.aim.dy,Game.Input.aim.dx);
         }
 
+        // Slash visual timer
+        if(this.slashTimer>0) this.slashTimer-=dt;
+
         // Attack
         if(this.attackCooldown>0) this.attackCooldown-=dt;
         var aimPushed = Game.Input.aim.active && (Game.Input.aim.dx!==0||Game.Input.aim.dy!==0);
@@ -108,9 +112,12 @@ Game.Player = {
             // Melee
             var dmg=cfg.damage*dmgMult;
             if(Math.random()<critChance) dmg*=2;
-            Game.Combat.meleeAttack(this.x,this.y,this.aimAngle,cfg.range||24,dmg);
-            Game.ParticleManager.spawn(this.x+Math.cos(this.aimAngle)*cfg.range,this.y+Math.sin(this.aimAngle)*cfg.range,0,0,'#fff',3,100);
+            var r=cfg.range||38;
+            Game.Combat.meleeAttack(this.x,this.y,this.aimAngle,r,dmg);
+            Game.ParticleManager.spawn(this.x+Math.cos(this.aimAngle)*r,this.y+Math.sin(this.aimAngle)*r,0,0,'#fff',3,100);
             this.attackCooldown=cfg.speed*spdMult;
+            // Trigger slash visual
+            this.slashTimer=150;this.slashAngle=this.aimAngle;this.slashRange=r;
         }
     },
 

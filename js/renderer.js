@@ -225,5 +225,20 @@ Game.Renderer = {
         var len = wCfg.range ? Math.min(wCfg.range, 22) : 12;
         ctx.strokeStyle = p.weapon ? '#ddd' : '#8bf'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len); ctx.stroke();
+
+        // Melee slash arc indicator
+        if (p.slashTimer > 0) {
+            var a = Math.min(1, p.slashTimer / 100);
+            var r = p.slashRange;
+            var arcHalf = 0.8; // ~90 degree arc, matching combat hit detection
+            ctx.strokeStyle = 'rgba(255,220,120,' + a + ')'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(sx, sy, r, p.slashAngle - arcHalf, p.slashAngle + arcHalf); ctx.stroke();
+            // Endcap lines
+            ctx.strokeStyle = 'rgba(255,180,80,' + (a * 0.6) + ')'; ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(p.slashAngle - arcHalf) * r, sy + Math.sin(p.slashAngle - arcHalf) * r);
+            ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(p.slashAngle + arcHalf) * r, sy + Math.sin(p.slashAngle + arcHalf) * r);
+            ctx.stroke();
+        }
     }
 };

@@ -67,10 +67,10 @@ Game.Config = {
         rifle_ammo:   { name: 'Rifle Ammo', type: 'ammo', stack: 40, icon: '#da5' },
         shotgun_ammo: { name: 'Shotgun Shells', type: 'ammo', stack: 30, icon: '#da5' },
         // Melee weapons
-        fists:   { name: 'Fists', type: 'melee', damage: 5, speed: 400, range: 24, icon: '#dba' },
-        knife:   { name: 'Knife', type: 'melee', damage: 12, speed: 350, range: 28, icon: '#bbb' },
-        bat:     { name: 'Bat', type: 'melee', damage: 18, speed: 550, range: 32, icon: '#8B5E3C' },
-        axe:     { name: 'Axe', type: 'melee', damage: 22, speed: 650, range: 30, icon: '#999' },
+        fists:   { name: 'Fists', type: 'melee', damage: 5, speed: 400, range: 38, icon: '#dba' },
+        knife:   { name: 'Knife', type: 'melee', damage: 12, speed: 350, range: 42, icon: '#bbb' },
+        bat:     { name: 'Bat', type: 'melee', damage: 18, speed: 550, range: 50, icon: '#8B5E3C' },
+        axe:     { name: 'Axe', type: 'melee', damage: 22, speed: 650, range: 46, icon: '#999' },
         // Ranged weapons
         pistol:  { name: 'Pistol', type: 'ranged', damage: 18, speed: 350, range: 200, ammo: 'pistol_ammo', bulletSpeed: 10, spread: 0.05, icon: '#777' },
         rifle:   { name: 'Rifle', type: 'ranged', damage: 35, speed: 700, range: 320, ammo: 'rifle_ammo', bulletSpeed: 14, spread: 0.02, icon: '#666' },
