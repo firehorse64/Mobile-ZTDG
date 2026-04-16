@@ -9,7 +9,7 @@ Game.Config = {
 
     TICK_RATE: 1000 / 30,
     PLAYER_SPEED: 2.8,
-    PLAYER_SPRINT_MULT: 1.7,
+    PLAYER_SPRINT_MULT: 1.4,
     PLAYER_RADIUS: 10,
 
     // Survival
@@ -39,10 +39,10 @@ Game.Config = {
     ZOMBIE_DETECT_RANGE: 180,
     ZOMBIE_NIGHT_DETECT: 250,
     ZOMBIE_TYPES: {
-        walker:  { health: 60, speed: 0.8, damage: 8, xp: 10, radius: 10, attackRate: 1200, color: '#5a5' },
-        runner:  { health: 30, speed: 2.0, damage: 5, xp: 15, radius: 8,  attackRate: 800,  color: '#c55' },
-        brute:   { health: 200, speed: 0.4, damage: 20, xp: 35, radius: 14, attackRate: 1800, color: '#666' },
-        spitter: { health: 45, speed: 0.9, damage: 12, xp: 20, radius: 9,  attackRate: 2000, color: '#5a8' }
+        walker:  { health: 60, speed: 0.8, damage: 8, xp: 10, radius: 10, attackRate: 1200, color: '#a33' },
+        runner:  { health: 30, speed: 2.0, damage: 5, xp: 15, radius: 8,  attackRate: 800,  color: '#e44' },
+        brute:   { health: 200, speed: 0.4, damage: 20, xp: 35, radius: 14, attackRate: 1800, color: '#722' },
+        spitter: { health: 45, speed: 0.9, damage: 12, xp: 20, radius: 9,  attackRate: 2000, color: '#c56' }
     },
 
     // Loot tables: [item, minQty, maxQty, chance]

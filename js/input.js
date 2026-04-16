@@ -38,11 +38,21 @@ Game.Input = {
         stick.dx=dx/maxR; stick.dy=dy/maxR;
     },
 
+    _isReservedTapZone(pos) {
+        // HUD buttons on the right side (sprint toggle, action buttons) should not trigger aim joystick
+        var hud = Game.HUD;
+        if (!hud) return false;
+        var sb = hud._sprintBtnRect;
+        if (sb && pos.x >= sb.x && pos.x <= sb.x + sb.w && pos.y >= sb.y && pos.y <= sb.y + sb.h) return true;
+        return false;
+    },
+
     onTouchStart(e) {
         e.preventDefault();
         for(var i=0;i<e.changedTouches.length;i++){
             var t=e.changedTouches[i],pos=this._getPos(t);
             if(Game.HUD&&Game.HUD.isScreenOpen()) { this._pendingTaps.push(pos); continue; }
+            if(this._isReservedTapZone(pos)) { this._pendingTaps.push(pos); continue; }
             var sw=this.canvas.width;
             if(pos.x<sw*0.35&&!this.joystick.active){
                 this.joystick.active=true;this.joystick.id=t.identifier;
@@ -84,6 +94,7 @@ Game.Input = {
         var pos={x:(e.clientX-r.left)*this.scaleX,y:(e.clientY-r.top)*this.scaleY};
         this._mouseDown=true;
         if(Game.HUD&&Game.HUD.isScreenOpen()){this._pendingTaps.push(pos);return;}
+        if(this._isReservedTapZone(pos)){this._pendingTaps.push(pos);return;}
         var sw=this.canvas.width;
         if(pos.x<sw*0.35){
             this.joystick.active=true;this.joystick.startX=pos.x;this.joystick.startY=pos.y;this.joystick.dx=0;this.joystick.dy=0;

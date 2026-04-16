@@ -4,7 +4,7 @@ Game.Player = {
     health:100,maxHealth:100,hunger:100,thirst:100,stamina:100,
     xp:0,level:1,skillPoints:0,
     weapon:null, // item id of equipped weapon
-    attackCooldown:0,sprinting:false,
+    attackCooldown:0,sprinting:false,sprintToggle:false,
     slashTimer:0,slashAngle:0,slashRange:0,
     skills:{combat:[0,0,0,0],survival:[0,0,0,0],building:[0,0,0,0],farming:[0,0,0,0]},
 
@@ -15,7 +15,7 @@ Game.Player = {
         this.health=c.MAX_HEALTH; this.maxHealth=c.MAX_HEALTH;
         this.hunger=c.MAX_HUNGER; this.thirst=c.MAX_THIRST; this.stamina=c.MAX_STAMINA;
         this.xp=0; this.level=1; this.skillPoints=0;
-        this.weapon=null; this.attackCooldown=0; this.sprinting=false;
+        this.weapon=null; this.attackCooldown=0; this.sprinting=false; this.sprintToggle=false;
         this.skills={combat:[0,0,0,0],survival:[0,0,0,0],building:[0,0,0,0],farming:[0,0,0,0]};
         this.aimAngle=0;this.facingAngle=0;
     },
@@ -33,10 +33,13 @@ Game.Player = {
         this.maxHealth=this.getMaxHealth();
 
         // Movement
-        if(joy.dx!==0||joy.dy!==0) {
+        var moving = (joy.dx!==0||joy.dy!==0);
+        // Sprint toggle: auto-disable when not moving or out of stamina
+        if(!moving || this.stamina<=0) this.sprintToggle=false;
+        this.sprinting = this.sprintToggle && moving && this.stamina>0;
+
+        if(moving) {
             var speed=c.PLAYER_SPEED;
-            // Sprint if joystick is pushed far
-            this.sprinting = (Math.abs(joy.dx)>0.85||Math.abs(joy.dy)>0.85) && this.stamina>5;
             if(this.sprinting) speed*=c.PLAYER_SPRINT_MULT;
 
             var nx=this.x+joy.dx*speed, ny=this.y+joy.dy*speed;
@@ -60,8 +63,6 @@ Game.Player = {
             this.facingAngle=Math.atan2(joy.dy,joy.dx);
 
             if(this.sprinting) this.stamina=Math.max(0,this.stamina-c.STAMINA_DRAIN*(1-this.skills.survival[2]*0.1));
-        } else {
-            this.sprinting=false;
         }
 
         // Stamina regen when not sprinting

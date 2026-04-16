@@ -124,8 +124,33 @@ Game.HUD = {
             }; })(idx) });
         }
 
-        // Context buttons - search/use
+        // Sprint toggle button - right side, above action buttons
         var self = this;
+        var spSize = 46, spX = sw - spSize - 5, spY = sh - 300;
+        this._sprintBtnRect = { x: spX, y: spY, w: spSize, h: spSize };
+        var joy = Game.Input.joystick, isMoving = (joy.dx !== 0 || joy.dy !== 0);
+        var sprintOn = p.sprintToggle;
+        var canSprint = isMoving && p.stamina > 0;
+        var spBg = sprintOn ? '#a53' : (canSprint ? '#542' : '#333');
+        var spBorder = sprintOn ? '#fc8' : (canSprint ? '#a75' : '#555');
+        ctx.fillStyle = spBg; ctx.beginPath(); ctx.arc(spX + spSize / 2, spY + spSize / 2, spSize / 2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = spBorder; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(spX + spSize / 2, spY + spSize / 2, spSize / 2, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = sprintOn ? '#fff' : (canSprint ? '#fc8' : '#777');
+        ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('RUN', spX + spSize / 2, spY + spSize / 2 + 4);
+        this._buttons.push({ x: spX, y: spY, w: spSize, h: spSize, action: function() {
+            if (Game.Player.sprintToggle) {
+                Game.Player.sprintToggle = false;
+            } else {
+                var j = Game.Input.joystick;
+                if ((j.dx !== 0 || j.dy !== 0) && Game.Player.stamina > 0) {
+                    Game.Player.sprintToggle = true;
+                }
+            }
+        }});
+
+        // Context buttons - search/use
         var tile = Game.World.worldToTile(p.x, p.y);
         // Check adjacent tiles for scavenge
         var canSearch = false;
